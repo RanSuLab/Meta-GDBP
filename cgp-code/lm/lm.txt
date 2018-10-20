@@ -1,0 +1,117 @@
+####build the the weighted model and get the predicted response
+setwd("D:/R/R-3.4.2/workspace/cgp-code/lm/lm-j1")
+cc <- read.csv("cclist.csv")
+cc <- cc[3:dim(cc)[1],]
+dd <- read.csv("ddlist.csv")
+dd <- dd[3:dim(dd)[1],]
+path <- read.csv("path.csv")
+path <- path[3:dim(path)[1],]
+go <- read.csv("go.csv")
+go <- go[3:dim(go)[1],]
+cc$DRUG_ID <- as.character(cc$DRUG_ID)
+for(i in 1:dim(cc)[1]){
+    cc$DRUG_ID[i]=paste("X",cc$DRUG_ID[i],sep="") 
+}
+dd$COSMIC_ID <- as.character(dd$COSMIC_ID)
+for(i in 1:dim(dd)[1]){
+
+    dd$COSMIC_ID[i]=paste("X",dd$COSMIC_ID[i],sep="")
+}
+names(dd) <- c("X.1.z","X.z","DRUG_ID","COSMIC_ID","IC50_Normal.z","dd_predict...2.","dd_real...2.")
+path$COSMIC_ID <- as.character(path$COSMIC_ID)
+for(i in 1:dim(path)[1]){
+
+    path$COSMIC_ID[i]=paste("X",path$COSMIC_ID[i],sep="")
+
+}
+cd <- merge(cc,dd,by=c("COSMIC_ID","DRUG_ID"))
+cdp <- merge(cd,path,by=c("COSMIC_ID","DRUG_ID"))
+go$COSMIC_ID <- as.character(go$COSMIC_ID)
+for(i in 1:dim(go)[1]){
+
+    go$COSMIC_ID[i]=paste("X",go$COSMIC_ID[i],sep="")
+
+}
+cdpg <- merge(cdp,go,by=c("COSMIC_ID","DRUG_ID"))
+write.csv(cdpg,"cdpg.csv")
+n=nrow(cdpg)
+set.seed(0)
+trainindex <- sample(1:n,0.5*n)
+traincdpg <- cdpg[trainindex,]
+testcdpg <- cdpg[-trainindex,]
+a<-cor(traincdpg$Cp,traincdpg$IC50_Normal.z)
+b<-cor(traincdpg$dd_predict...2..x,traincdpg$IC50_Normal.z)
+c<-cor(traincdpg$dd_predict...2..y,traincdpg$IC50_Normal.z)
+d<-cor(traincdpg$dd_predict...2.,traincdpg$IC50_Normal.z)
+a1 <- a/(a+b+c+d)
+b1 <- b/(a+b+c+d)
+c1 <- c/(a+b+c+d)
+d1 <- d/(a+b+c+d)
+y <- a1*testcdpg$Cp+c1*testcdpg$dd_predict...2..y + b1*testcdpg$dd_predict...2..x + d1*testcdpg$dd_predict...2.
+re <-cor(y,testcdpg$IC50_Normal.z)
+print(re)
+aa <- data.frame(testcdpg$COSMIC_ID,testcdpg$DRUG_ID,y,testcdpg$IC50_Normal.z)
+write.csv(aa,"pr.csv")
+
+
+
+
+
+####generate predicted response file for each drug 
+setwd("D:/R/R-3.4.2/workspace/cgp-code/lm/lm-j1")
+cdpg <- read.csv("cdpg.csv")
+pr <- read.csv("pr.csv")
+colnames(pr)[3] <- "DRUG_ID"
+colnames(pr)[2] <- "COSMIC_ID"
+colnames(pr)[1] <- "ID"
+colnames(pr)[5] <- "IC50_Normal.pr"
+test_data <- merge(cdpg,pr,by=c("COSMIC_ID","DRUG_ID"))
+test_data2 <- test_data[,1:2]
+test_data2$IC50_Normal <- test_data$IC50_Normal.z
+test_data2$pre <- test_data$y
+write.csv(test_data2,"test_data2.csv")
+drugs <- levels(test_data2$DRUG_ID)
+write.table(drugs,"drugs.txt")
+d_p <- c()
+for(i in 1:length(drugs)){
+  filename <- paste(i,"_pre.csv",sep="")
+  test_data3 <- test_data2[which(test_data2$DRUG_ID==drugs[i]),]
+  real_y <- test_data3$IC50_Normal
+  test_y <- test_data3$pre
+  write.csv(test_data3,filename)
+  pearson <- cor(test_y,real_y)
+  d_p[1] <- drugs[i]
+  d_p[2] <- pearson
+  cat(d_p,file="drugs_pearson.txt",seq="\n",append=T) 
+}
+
+
+####merge the 10 folds results together and get the final result
+setwd("D:/R/R-3.4.2/workspace/cgp-code/lm2")
+data1 <- read.table("lm-j1/drugs_pearson.txt",header=FALSE)
+data2 <- read.table("lm-j2/drugs_pearson.txt",header=FALSE)
+data3 <- read.table("lm-j3/drugs_pearson.txt",header=FALSE)
+data4 <- read.table("lm-j4/drugs_pearson.txt",header=FALSE)
+data5 <- read.table("lm-j5/drugs_pearson.txt",header=FALSE)
+data6 <- read.table("lm-j6/drugs_pearson.txt",header=FALSE)
+data7 <- read.table("lm-j7/drugs_pearson.txt",header=FALSE)
+data8 <- read.table("lm-j8/drugs_pearson.txt",header=FALSE)
+data9 <- read.table("lm-j9/drugs_pearson.txt",header=FALSE)
+data10 <- read.table("lm-j10/drugs_pearson.txt",header=FALSE)
+data <- merge(data1,data2,by="V1")
+data <- merge(data,data3,by="V1")
+data <- merge(data,data4,by="V1")
+data <- merge(data,data5,by="V1")
+data <- merge(data,data6,by="V1")
+data <- merge(data,data7,by="V1")
+data <- merge(data,data8,by="V1")
+data <- merge(data,data9,by="V1")
+data <- merge(data,data10,by="V1")
+write.csv(data,"data.csv")
+col_mean <- c()
+for(i in 1:dim(data)[1]){
+  a <- as.numeric(data[i,])
+  col_mean[i] <- mean(a[2:11])
+}
+names(col_mean) <- data$V1
+write.csv(col_mean,"drug_10p.csv")

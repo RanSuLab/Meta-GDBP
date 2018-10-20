@@ -1,0 +1,243 @@
+#### build the DBM model
+library("caret") 
+setwd("D:/R/R-3.4.2/workspace/cgp-code/dd_fp/ensemble_dd")
+load("cgp_drugdata.RData")
+load("folds.RData")
+train_drugdata <- list()
+test_drugdata <- list()	
+celllines <- levels(as.factor(cgp_drugdata$COSMIC_ID))
+for(k in 1:1074){
+  for(j in 1:10){
+    traindata<-cgp_drugdata[-folds[[j]],]  
+    testdata<-cgp_drugdata[folds[[j]],]
+    dsn <- read.csv("fingerprints.csv")
+	for(i in 1:dim(dsn)[1]){
+	  dsn$DRUG_ID[i] <- paste("X",dsn$DRUG_ID[i],sep="")
+	}
+    train_drugdata[[k]] <- traindata[which(traindata$COSMIC_ID==celllines[k]),]
+	if(dim(train_drugdata[[k]])[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+    for(i in 1:dim(train_drugdata[[k]])[1]){
+      train_drugdata[[k]]$DRUG_ID[i] <- paste("X",train_drugdata[[k]]$DRUG_ID[i],sep="")
+    }
+    colnames(dsn)[1] <- "DRUG_ID"
+    traindsn <- merge(train_drugdata[[k]],dsn,by="DRUG_ID")
+
+	if(dim(traindsn)[1]<=1){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+    traindsn2 <- traindsn[,7:dim(traindsn)[2]]
+
+    trainy <- traindsn$IC50_Normal
+    X2 <- as.matrix(traindsn2)
+    library("msgps")
+    fit_dd <- msgps(X2,trainy,penalty="enet",alpha=0.5)
+	filename2 <- paste(k,j,sep="")
+	filename5 <- paste(filename2,".csv",sep="")  
+    test_drugdata[[k]] <- testdata[which(testdata$COSMIC_ID==celllines[k]),]
+	if(dim(test_drugdata[[k]])[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+    for(i in 1:dim(test_drugdata[[k]])[1]){
+      test_drugdata[[k]]$DRUG_ID[i] <- paste("X",test_drugdata[[k]]$DRUG_ID[i],sep="")
+    }
+    testdsn <- merge(test_drugdata[[k]],dsn,by="DRUG_ID")
+	if(dim(testdsn)[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+	write.csv(testdsn,filename5)
+    testdsn2 <- testdsn[,7:dim(testdsn)[2]]
+    X2 <- as.matrix(testdsn2)
+    testy <- testdsn$IC50_Normal
+    a <- predict(fit_dd,X2)
+    filename3 <- paste(filename2,"ddpredict.csv")
+    write.csv(a,filename3)
+    filename4 <- paste(filename2,"ddreal.csv")
+    write.csv(testy,filename4) 
+    dresult <- c()
+
+	  if(length(a)>1){
+	    if(sd(a)==0){
+	     dresult <- "NA"
+		}else{
+		  dresult <- cor(a,testy)
+		}
+	  }else{
+       dresult <- cor(a,testy)
+	  }
+
+	filename6 <- paste(k,"dresult.txt",sep="")
+    cat(dresult,file=filename6,seq="\n",append=T)
+  }
+}
+#### you need to put all the output files into correct file
+####such as put the output files of cellline 1 into the dir 1-10
+####put the output files of cellline 11 into the dir 11-20
+####put the output files of cellline 21 into the dir 21-30...
+
+
+#### put all the output files in one fold into one dir
+
+setwd("D:/R/R-3.4.2/workspace/cgp-code/dd_fp/ensemble_dd")
+
+for(i in 1:1070){
+ if(i%%10==1){
+   dir1 <- paste(i,"-",sep="")
+   dir <- paste(dir1,i+9,sep="")
+ }
+ if(i%%10==2){
+   dir1 <- paste(i-1,"-",sep="")
+   dir <- paste(dir1,i+8,sep="")
+ }
+ if(i%%10==3){
+   dir1 <- paste(i-2,"-",sep="")
+   dir <- paste(dir1,i+7,sep="")
+ }
+ if(i%%10==4){
+   dir1 <- paste(i-3,"-",sep="")
+   dir <- paste(dir1,i+6,sep="")
+ }
+ if(i%%10==5){
+   dir1 <- paste(i-4,"-",sep="")
+   dir <- paste(dir1,i+5,sep="")
+ }
+ if(i%%10==6){
+   dir1 <- paste(i-5,"-",sep="")
+   dir <- paste(dir1,i+4,sep="")
+ }
+ if(i%%10==7){
+   dir1 <- paste(i-6,"-",sep="")
+   dir <- paste(dir1,i+3,sep="")
+ }
+ if(i%%10==8){
+   dir1 <- paste(i-7,"-",sep="")
+   dir <- paste(dir1,i+2,sep="")
+ }
+ if(i%%10==9){
+   dir1 <- paste(i-8,"-",sep="")
+   dir <- paste(dir1,i+1,sep="")
+ }
+ if(i%%10==0){
+   dir1 <- paste(i-9,"-",sep="")
+   dir <- paste(dir1,i,sep="")
+ }
+ dir_path <- paste(dir,"/",sep="")
+ filename1 <- paste(i,"1 ddpredict.csv",sep="")
+ filename2 <- paste(i,"1 ddreal.csv",sep="")
+ filename3 <- paste(i,"1.csv",sep="")
+ filepath1 <- paste(dir_path,filename1,sep="")
+ filepath2 <- paste(dir_path,filename2,sep="")
+ filepath3 <- paste(dir_path,filename3,sep="")
+ path1 <- paste("j=1/",filename1,sep="")
+ path2 <- paste("j=1/",filename2,sep="")
+ path3 <- paste("j=1/",filename3,sep="")
+ file.copy(filepath1, path1)
+ file.copy(filepath2, path2)
+ file.copy(filepath3, path3)
+}
+
+for(i in 1071:1074){
+ filename1 <- paste(i,"1 ddpredict.csv",sep="")
+ filename2 <- paste(i,"1 ddreal.csv",sep="")
+ filename3 <- paste(i,"1.csv",sep="")
+ filepath1 <- paste("1071-1074/",filename1,sep="")
+ filepath2 <- paste("1071-1074/",filename2,sep="")
+ filepath3 <- paste("1071-1074/",filename3,sep="")
+ path1 <- paste("j=1/",filename1,sep="")
+ path2 <- paste("j=1/",filename2,sep="")
+ path3 <- paste("j=1/",filename3,sep="")
+ file.copy(filepath1, path1)
+ file.copy(filepath2, path2)
+ file.copy(filepath3, path3)
+}
+
+
+
+
+
+####merge all the test result into one file of each fold
+setwd("D:/R/R-3.4.2/workspace/cgp-code/dd_fp/ensemble_dd/j=1")
+for(i in 1:1074){
+  filename <- paste(i,"1",sep="")
+  filename1 <- paste(i,"1 ddpredict.csv",sep="")
+  filename2 <- paste(i,"1 ddreal.csv",sep="")
+  filename3 <- paste(i,"1.csv",sep="")
+  x.inv <- try(dd_cd <- read.csv(filename3),silent=TRUE)
+  if ('try-error' %in% class(x.inv)) next 
+  dd_predict <- read.csv(filename1)
+  dd_real <- read.csv(filename2)
+  dd <- cbind(dd_cd[,2:4],dd_predict[,2])
+  dd <- cbind(dd,dd_real[,2])
+  dd$IC50_Normal <- dd_cd$IC50_Normal
+  write.csv(dd,paste(filename,"ddcols.csv",sep=""))
+  
+}
+ddlist <- data.frame(matrix(NA,2,6))
+names(ddlist) <- c("X","DRUG_ID","COSMIC_ID","IC50_Normal" ,"dd_predict...2.","dd_real...2.")
+for(i in 1:1074){
+  filename <- paste(i,"1",sep="")  
+  x.inv <- try(dd<- read.csv(paste(filename,"ddcols.csv",sep="")),silent=TRUE)
+  if ('try-error' %in% class(x.inv)) next   
+  ddlist <- rbind(ddlist,dd) 
+}
+write.csv(ddlist,"ddlist.csv")
+print(cor(ddlist$dd_predict...2.[3:dim(ddlist)[1]],ddlist$IC50_Normal[3:dim(ddlist)[1]]))
+
+
+
+
+
+
+
+
+
+
+
+
+####For each fold, get the pearson correation of predicted response and observed response of each drug,and put them into one file
+setwd("D:/R/R-3.4.2/workspace/cgp-code/dd_fp/ensemble_dd")
+data1 <- read.csv("j=1/ddlist.csv")
+data1 <- data1[3:dim(data1)[1],]
+drugs <- levels(data1$DRUG)
+all_data <- data.frame(matrix(NA,2,2))
+names(all_data) <- c("drugs.i.","a")
+for(i in 1:length(drugs)){
+  drug <- data1[which(data1$DRUG==drugs[i]),]
+  a <- cor(drug$dd_predict...2.,drug$IC50_Normal)
+  drug_data <- data.frame(drugs[i],a)
+  all_data <- rbind(all_data,drug_data)
+}
+all_data <- all_data[3:dim(all_data)[1],]
+write.csv(all_data,"data-j1.csv")
+
+
+
+
+
+
+
+
+
+
+####Merge all the pearson result of each fold into one file,the cc model accuarcy can be found in dddd_cc.csv
+dddd1 <- read.csv("data-j1.csv")
+dddd2 <- read.csv("data-j2.csv")
+dddd3 <- read.csv("data-j3.csv")
+dddd4 <- read.csv("data-j4.csv")
+dddd5 <- read.csv("data-j5.csv")
+dddd6 <- read.csv("data-j6.csv")
+dddd7 <- read.csv("data-j7.csv")
+dddd8 <- read.csv("data-j8.csv")
+dddd9 <- read.csv("data-j9.csv")
+dddd10 <- read.csv("data-j10.csv")
+dddd_cc <- data.frame(dddd1$drugs.i.,dddd1$a,dddd2$a,dddd3$a,dddd4$a,dddd5$a,dddd6$a,dddd7$a,dddd8$a,dddd9$a,dddd10$a)
+write.csv(dddd_cc,"dddd_cc.csv")

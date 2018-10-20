@@ -1,0 +1,125 @@
+setwd("D:/R/R-3.4.2/workspace/cgp-all/kegg_normal")
+load("path_data_matrix.RData")
+path_data_matrix_normal <- path_data_matrix
+for(i in 1:dim(path_data_matrix)[1]){
+  path_i <- path_data_matrix[i,]
+  path_i_normal <- (path_i-min(path_i))/(max(path_i)-min(path_i))
+  path_data_matrix_normal[i,] <- path_i_normal
+}
+write.csv(path_data_matrix_normal,"path_data_matrix_normal.csv")
+save(path_data_matrix_normal,file="path_data_matrix_normal.RData")
+result <- cor(path_data_matrix_normal,method="pearson")
+write.csv(result,"dd_pathway.csv")
+
+
+
+
+
+setwd("D:/R/R-3.4.2/workspace/cgp-all/kegg_normal/dd-kegg(0.8)")
+library("caret") 
+load("cgp_drugdata.RData")
+load("folds.RData")
+train_drugdata <- list()
+test_drugdata <- list()	
+celllines <- levels(as.factor(cgp_drugdata$COSMIC_ID))
+for(k in 1:1074){
+  for(j in 1:10){
+    traindata<-cgp_drugdata[-folds[[j]],]  
+    testdata<-cgp_drugdata[folds[[j]],]
+	load("path_data_matrix_normal.RData")
+	path_data <- t(path_data_matrix_normal)
+    dsn <- data.frame(path_data)		
+	dsn$DRUG_ID <- paste("X",rownames(dsn),sep="")
+	cellline_drugdata <- cgp_drugdata[which(cgp_drugdata$COSMIC_ID==celllines[k]),]
+	cellline_drugdata$DRUG_ID <- as.character(cellline_drugdata$DRUG_ID)
+    for(i in 1:dim(cellline_drugdata)[1]){
+      cellline_drugdata$DRUG_ID[i] <- paste("X",cellline_drugdata$DRUG_ID[i],sep="")
+    }
+    train_drugdata[[k]] <- traindata[which(traindata$COSMIC_ID==celllines[k]),]
+	if(dim(train_drugdata[[k]])[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+    for(i in 1:dim(train_drugdata[[k]])[1]){
+      train_drugdata[[k]]$DRUG_ID[i] <- paste("X",train_drugdata[[k]]$DRUG_ID[i],sep="")
+    }
+	traindsn <- merge(train_drugdata[[k]],dsn,by="DRUG_ID")
+	alldsn <- merge(cellline_drugdata,dsn,by="DRUG_ID")
+	if(dim(traindsn)[1]<=1){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+    traindsn2 <- traindsn[,7:dim(traindsn)[2]]
+	alldsn2 <- alldsn[,7:dim(alldsn)[2]]
+    ally <- alldsn$IC50_Normal	
+    trainy <- traindsn$IC50_Normal
+	for(i in 1:dim(traindsn2)[2]){
+	  traindsn2[,i] <- as.numeric(traindsn2[,i])
+	}
+	
+    X2 <- as.matrix(traindsn2)
+	library("e1071")
+	if(dim(alldsn2)[1]<4){
+	  spe <- paste(k,j)
+	  cat(spe,file="special2.txt",seq="\n",append=T)
+	  next	  
+	}
+    svm.fit<-svm(alldsn2,ally,scale=FALSE)
+	weight <- t(svm.fit$coefs) %*% svm.fit$SV
+	weight2 <- (weight-min(weight))/(max(weight)-min(weight))
+	weight3 <- weight2[,weight2>0.8]
+	
+	cat(length(weight3),file="weight3.txt",seq="\n",append=T)
+    library("e1071")
+    model <- svm(X2[,names(weight3)],trainy,scale=FALSE)
+	filename2 <- paste(k,j,sep="")
+	filename5 <- paste(filename2,".csv",sep="")  
+    test_drugdata[[k]] <- testdata[which(testdata$COSMIC_ID==celllines[k]),]
+	if(dim(test_drugdata[[k]])[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+	test_drugdata[[k]]$DRUG_ID <- as.character(test_drugdata[[k]]$DRUG_ID)
+    for(i in 1:dim(test_drugdata[[k]])[1]){
+      test_drugdata[[k]]$DRUG_ID[i] <- paste("X",test_drugdata[[k]]$DRUG_ID[i],sep="")
+    }
+    testdsn <- merge(test_drugdata[[k]],dsn,by="DRUG_ID")
+	if(dim(testdsn)[1]==0){
+	  spe <- paste(k,j)
+	  cat(spe,file="special.txt",seq="\n",append=T)
+	  next
+	}
+	write.csv(testdsn,filename5)
+    testdsn2 <- testdsn[,7:dim(testdsn)[2]]
+	for(i in 1:dim(testdsn2)[2]){
+	  testdsn2[,i] <- as.numeric(testdsn2[,i])
+	}
+    X2 <- as.matrix(testdsn2)
+    testy <- testdsn$IC50_Normal
+    if(dim(X2)[1]==1){
+         a <- predict(model,t(as.matrix(X2[,names(weight3)])))
+    }else{
+         a <- predict(model,X2[,names(weight3)])
+    }
+    filename3 <- paste(filename2,"ddpredict.csv")
+    write.csv(a,filename3)
+    filename4 <- paste(filename2,"ddreal.csv")
+    write.csv(testy,filename4) 
+    dresult <- c()
+	  if(length(a)>1){
+	    if(sd(a)==0){
+	     dresult <- "NA"
+		}else{
+		  dresult <- cor(a,testy)
+		}
+	  }else{
+       dresult <- cor(a,testy)
+	  }
+	filename6 <- paste(k,"dresult.txt",sep="")
+    cat(dresult,file=filename6,seq="\n",append=T)	
+  }
+}
+

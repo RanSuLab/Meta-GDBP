@@ -1,0 +1,42 @@
+#### generate WGCNA models for each drug
+setwd("D:/R/R-3.4.2/workspace/cgp-code/wgcna")
+library("WGCNA")
+options(stringsAsFactors = FALSE)
+enableWGCNAThreads()
+load("cgp_drugdata.RData")
+load("cgp_exprSet3.RData")
+drugdata <- list()
+alldata <- list()
+drugs <- levels(as.factor(cgp_drugdata$DRUG_ID))
+for(i in 1:265){
+  drugdata[[i]] <- cgp_drugdata[which(cgp_drugdata$DRUG_ID==drugs[i]),]
+  alldata[[i]] <- merge(drugdata[[i]],cgp_exprSet3,by="COSMIC_ID")
+  drug_sensitivity <- alldata[[i]]$IC50_Normal
+  dodata <- alldata[[i]][,-(1:6)]
+  powers = c(c(1:10), seq(from = 12, to=20, by=2))
+  datExpr <- dodata
+  sft = pickSoftThreshold(datExpr, powerVector = powers, verbose = 5)
+  bwnet = blockwiseModules(datExpr, maxBlockSize = 2000, power = sft$powerEstimate, TOMType = "unsigned", minModuleSize =30, reassignThreshold = 0, mergeCutHeight = 0.25, numericLabels = TRUE, saveTOMs = TRUE, saveTOMFileBase = "test", verbose = 3)
+  models <- table(bwnet$colors)
+  filename1 <- paste(i,"-models.csv",sep="")
+  write.csv(models,filename1)  
+  genes <- bwnet$colors 
+  filename2 <- paste(i,"-genes.csv",sep="")
+  write.csv(genes,filename2)  
+  bwLabel <- labels2colors(bwnet$colors)
+  hub <- chooseTopHubInEachModule(datExpr, bwLabel)
+  filename3 <- paste(i,"-hub.csv",sep="")
+  write.csv(hub,filename3)
+  cors <- c()
+  for(j in 1:length(hub)){
+    hubgene <- dodata[,which(names(dodata)==hub[j])]
+    cors[j] <- cor(hubgene,drug_sensitivity,method="pearson")
+  }
+  names(cors) <- names(hub) 
+  filename4 <-  paste(i,"-cords.csv",sep="") 
+  write.csv(cors,filename4)
+  dodata1 <- dodata[,hub]
+  matrix <- cor(dodata1,method="pearson")
+  filename5 <-  paste(i,"-corgg.csv",sep="") 
+  write.csv(matrix,filename5)
+}  

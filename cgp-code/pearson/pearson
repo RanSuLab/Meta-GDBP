@@ -1,0 +1,69 @@
+cgp drug-file: v17_fitted_dose_response.xlsx
+    gene-file:  sanger1018_brainarray_ensemblgene_rma.txt.gz
+
+#### 1 normalize drug sensitive(ic50)
+setwd("D:/R/R-3.4.2/workspace/cgp-code/pearson")
+cgpdrug <- read.csv("drug.csv",header=TRUE)
+cgp_ic50 <- cgpdrug$LN_IC50
+ic50_normal <- (cgp_ic50-mean(cgp_ic50))/(sd(cgp_ic50))
+mean(ic50_normal)
+var(ic50_normal)
+ic50plot <- data.frame(COSMIC_ID=cgpdrug$COSMIC_ID,DRUG_ID=cgpdrug$DRUG_ID,IC50_Normal=ic50_normal,Pos=ic50_normal>0)
+orderic50 <- ic50plot[order(-ic50plot$IC50_Normal),]
+orderic50$ID=c(1:224510)
+library("ggplot2")
+ggplot(orderic50,aes(x=ID,y=IC50_Normal,fill=Pos))+geom_bar(stat="identity",position="identity",color="black",size=0.1)+scale_fill_manual(values=c("#CCEEFF","#FFDDDD"),guide=FALSE)
+ yx.function <- function(x){
+  if(x<(-0.8)){
+   return("S")
+  }else if(x>0.8){
+   return("R")
+  }else{
+   return("0")
+  }
+ }
+ for(i in 1:224510){
+  orderic50$y[i]=yx.function(orderic50$IC50_Normal[i])
+ }
+cgp_drugdata <- orderic50[order(orderic50$DRUG_ID,orderic50$COSMIC_ID),] 
+###output### save(cgp_drugdata,file="cgp_drugdata.RData")
+
+#### 2 prepare gene exprSet
+cgp_exprSet <- read.table("gene.txt",header=TRUE)
+cgp_exprSet_matrix <- data.matrix(cgp_exprSet[,2:1019])
+rownames <- cgp_exprSet$ensembl_gene
+row.names(cgp_exprSet_matrix) <- rownames
+cgp_exprSet <- data.frame(cgp_exprSet_matrix)
+cgp_exprSet2 <- t(data.frame(cgp_exprSet))
+cgp_exprSet3 <- data.frame(cgp_exprSet2)
+cosid <- names(cgp_exprSet)
+cosid <- cosid[2:1019]
+for(i in 1:1018)
+{
+ cgp_exprSet3$COSMIC_ID[i]=substring(cosid[i],2)
+}
+###output### save(cgp_exprSet3,file="cgp_exprSet3.RData")
+gene_cid <- cgp_exprSet3$COSMIC_ID
+
+
+#### 3 generate cell line-cell line pearson files for each drug
+a <- gene_cid[gene_cid%in%cgp_drugdata$COSMIC_ID]
+drugs <- levels(as.factor(cgp_drugdata$DRUG_ID))
+drugdata <- list()
+alldata <- list()
+for(i in 1:265){
+  drug <- drugs[i]
+  drugdata[[i]] <- cgp_drugdata[which(cgp_drugdata$DRUG_ID==drug),]
+  alldata[[i]] <- merge(drugdata[[i]],cgp_exprSet3,by="COSMIC_ID")
+  eachd_cellline <- alldata[[i]]$COSMIC_ID 
+  s<-c()
+  for(j in 1:length(eachd_cellline)){
+    s[j] <- paste("X",eachd_cellline[j],sep="")
+  }
+  celldata <- cgp_exprSet[,s]
+  result <- cor(celldata,method="pearson")
+  filename <- paste(i,".csv",sep="")
+  write.csv(result,filename)
+}
+###"1.csv" will be the example output file### 
+  

@@ -1,0 +1,105 @@
+setwd("D:/R/R-3.4.2/workspace/cgp-code/kegg")
+load("cgp_drugdata.RData")
+load("cgp_exprSet3.RData")
+drugdata <- list()
+alldata <- list()
+drugs <- levels(as.factor(cgp_drugdata$DRUG))
+for(i in 1:265){
+  drugdata[[i]] <- cgp_drugdata[which(cgp_drugdata$DRUG==drugs[i]),]
+  alldata[[i]] <- merge(drugdata[[i]],cgp_exprSet3,by="COSMIC_ID")
+  gene_name <- names(alldata[[i]])[7:17743]
+
+  gene_file <- paste(i,"-genes.csv",sep="")
+  genes <- read.csv(gene_file)
+  pathways <- c()
+  for(j in 1:max(genes$x)){
+    set.seed(0)
+    module_gene <- gene_name[genes$x==j]
+	entrz_id <- read.table("entrz.txt",header=TRUE)
+	mg <- data.frame(From=module_gene)
+	module_gene_entrzid <- merge(mg,entrz_id,by="From")
+	require(clusterProfiler)
+    ekk_module <- enrichKEGG(gene=module_gene_entrzid$To,organism="human",pvalueCutoff=0.05)
+    pathways <- c(pathways,ekk_module$ID)
+	print(pathways)
+	
+  }
+  path_filename <- paste(i,"_pathway.csv",sep="")###kegg pathway frequency for each drug 
+  write.csv(table(pathways),path_filename)
+}
+###all the pathways in cgp
+pathways<- c()
+for(i in 1:265){
+  path_filename <- paste(i,"_pathway.csv",sep="")
+  drug_pathway <- read.csv(path_filename)
+  pathways <- union(pathways,drug_pathway$pathways)
+}
+write.csv(pathways,"pathways.csv")
+###generate kegg frequency matrix for cgp
+path_data <- data.frame(matrix(NA,2,290))
+names(path_data) <- pathways
+for(i in 1:265){
+  path <- rep(0,290)
+  names(path) <- pathways
+  path_filename <- paste(i,"_pathway.csv",sep="")
+  drug_pathway <- read.csv(path_filename)
+  path[as.character(drug_pathway$pathways)] <- drug_pathway$Freq
+  path_data <- rbind(path_data,path)
+}
+path_data <- path_data[3:267,]
+path_data$DRUG <- drugs
+path_data2 <- path_data[,1:290]
+path_data_matrix <- t(path_data2)
+colnames(path_data_matrix) <- path_data$DRUG
+save(path_data_matrix,file="path_data_matrix.RData")
+write.csv(path_data_matrix,"path_data_matrix.csv")
+result <- cor(path_data_matrix,method="pearson")
+write.csv(result,"dd_pathway.csv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+setwd("D:/R/R-3.4.2/workspace/cgp-all/kegg")
+load("cgp_drugdata.RData")
+load("cgp_exprSet3.RData")
+drugdata <- list()
+alldata <- list()
+
+drugs <- levels(as.factor(cgp_drugdata$DRUG))
+for(i in 206:265){
+  drugdata[[i]] <- cgp_drugdata[which(cgp_drugdata$DRUG==drugs[i]),]
+  alldata[[i]] <- merge(drugdata[[i]],cgp_exprSet3,by="COSMIC_ID")
+  gene_name <- names(alldata[[i]])[7:17743]
+
+  gene_file <- paste(i,"-genes.csv",sep="")
+  genes <- read.csv(gene_file)
+  pathways <- c()
+  for(j in 1:max(genes$x)){
+    set.seed(0)
+    module_gene <- gene_name[genes$x==j]
+	entrz_id <- read.table("entrz.txt",header=TRUE)
+	mg <- data.frame(From=module_gene)
+	module_gene_entrzid <- merge(mg,entrz_id,by="From")
+	require(clusterProfiler)
+    ekk_module <- enrichKEGG(gene=module_gene_entrzid$To,organism="human",pvalueCutoff=0.05)
+	if(is.null(ekk_module)){
+	  next
+	}
+	module_gene_num <- paste(i,paste(j,substring(ekk_module$GeneRatio[1],gregexpr("/", ekk_module$GeneRatio[1])[[1]][1]+1,nchar(ekk_module$GeneRatio[1])),sep=","),sep=",")
+    cat(module_gene_num,file="kegg_module_gene_num.txt",sep="\n",append=TRUE)
+	
+  }
+}
+
