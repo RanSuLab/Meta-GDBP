@@ -1,0 +1,123 @@
+setwd("D:/R/R-3.4.2/workspace/ccle_code/lm-test/lm-j1")
+cc <- read.csv("cclist.csv")
+dd <- read.csv("ddlist.csv")
+path <- read.csv("path.csv")
+go <- read.csv("go.csv")
+cc$DRUG <- as.character(cc$DRUG)
+for(i in 1:dim(cc)[1]){
+  if(substring(cc$DRUG[i],1,1)%in% c("0","1","2","3","4","5","6","7","8","9")){
+    cc$DRUG[i]=paste("X",cc$DRUG[i],sep="")
+  }else{
+    cc$DRUG[i]=cc$DRUG[i]
+  } 
+}
+dd$CName <- as.character(dd$CName)
+for(i in 1:dim(dd)[1]){
+  if(substring(dd$CName[i],1,1)%in% c("0","1","2","3","4","5","6","7","8","9")){
+    dd$CName[i]=paste("X",dd$CName[i],sep="")
+  }else{
+    dd$CName[i]=dd$CName[i]
+  } 
+}
+names(dd) <- c("X.1.z","X.z","DRUG","CName","PName.z","dd_predict...2.","dd_real...2.","Acta_Normal.z")
+path$CName <- as.character(path$CName)
+for(i in 1:dim(path)[1]){
+  if(substring(path$CName[i],1,1)%in% c("0","1","2","3","4","5","6","7","8","9")){
+    path$CName[i]=paste("X",path$CName[i],sep="")
+  }else{
+    path$CName[i]=path$CName[i]
+  } 
+}
+cd <- merge(cc,dd,by=c("CName","DRUG"))
+cdp <- merge(cd,path,by=c("CName","DRUG"))
+go$CName <- as.character(go$CName)
+for(i in 1:dim(go)[1]){
+  if(substring(go$CName[i],1,1)%in% c("0","1","2","3","4","5","6","7","8","9")){
+    go$CName[i]=paste("X",go$CName[i],sep="")
+  }else{
+    go$CName[i]=go$CName[i]
+  } 
+}
+cdpg <- merge(cdp,go,by=c("CName","DRUG"))
+write.csv(cdpg,"cdpg.csv")
+n=nrow(cdpg)
+set.seed(0)
+trainindex <- sample(1:n,0.5*n)
+traincdpg <- cdpg[trainindex,]
+testcdpg <- cdpg[-trainindex,]
+a<-cor(traincdpg$Cp,traincdpg$Acta_Normal.z)
+c<-cor(traincdpg$dd_predict...2..y,traincdpg$Acta_Normal.z)
+b<-cor(traincdpg$dd_predict...2..x,traincdpg$Acta_Normal.z)
+d<-cor(traincdpg$dd_predict...2.,traincdpg$Acta_Normal.z)
+a1 <- a/(a+b+c+d)
+c1 <- c/(a+b+c+d)
+b1 <- b/(a+b+c+d)
+d1 <- d/(a+b+c+d)
+y <- a1*testcdpg$Cp+c1*testcdpg$dd_predict...2..y + b1*testcdpg$dd_predict...2..x + d1*testcdpg$dd_predict...2.
+re <-cor(y,testcdpg$Acta_Normal.z)
+print(re)
+aa <- data.frame(testcdpg$CName,testcdpg$DRUG,y,testcdpg$Acta_Normal.z)
+write.csv(aa,"pr.csv")
+
+
+
+
+
+
+setwd("D:/R/R-3.4.2/workspace/ccle_code/lm-test/lm-j1")
+cdpg <- read.csv("cdpg.csv")
+pr <- read.csv("pr.csv")
+colnames(pr)[3] <- "DRUG"
+colnames(pr)[2] <- "CName"
+colnames(pr)[1] <- "ID"
+colnames(pr)[5] <- "Acta_Normal.pr"
+test_data <- merge(cdpg,pr,by=c("CName","DRUG"))
+test_data2 <- test_data[,1:2]
+test_data2$Acta_Normal <- test_data$Acta_Normal.z
+test_data2$pre <- test_data$y
+write.csv(test_data2,"test_data2.csv")
+drugs <- levels(test_data2$DRUG)
+write.table(drugs,"drugs.txt")
+d_p <- c()
+for(i in 1:length(drugs)){
+  filename <- paste(i,"_pre.csv",sep="")
+  test_data3 <- test_data2[which(test_data2$DRUG==drugs[i]),]
+  test_y <- test_data3$Acta_Normal
+  real_y <- test_data3$pre
+  write.csv(test_data3,filename)
+  pearson <- cor(test_y,real_y)
+  d_p[1] <- drugs[i]
+  d_p[2] <- pearson
+  cat(d_p,file="drugs_pearson.txt",seq="\n",append=T) 
+}
+
+
+
+setwd("D:/R/R-3.4.2/workspace/ccle_code/lm-test")
+data1 <- read.table("lm-j1/drugs_pearson.txt",header=FALSE)
+data2 <- read.table("lm-j2/drugs_pearson.txt",header=FALSE)
+data3 <- read.table("lm-j3/drugs_pearson.txt",header=FALSE)
+data4 <- read.table("lm-j4/drugs_pearson.txt",header=FALSE)
+data5 <- read.table("lm-j5/drugs_pearson.txt",header=FALSE)
+data6 <- read.table("lm-j6/drugs_pearson.txt",header=FALSE)
+data7 <- read.table("lm-j7/drugs_pearson.txt",header=FALSE)
+data8 <- read.table("lm-j8/drugs_pearson.txt",header=FALSE)
+data9 <- read.table("lm-j9/drugs_pearson.txt",header=FALSE)
+data10 <- read.table("lm-j10/drugs_pearson.txt",header=FALSE)
+data <- merge(data1,data2,by="V1")
+data <- merge(data,data3,by="V1")
+data <- merge(data,data4,by="V1")
+data <- merge(data,data5,by="V1")
+data <- merge(data,data6,by="V1")
+data <- merge(data,data7,by="V1")
+data <- merge(data,data8,by="V1")
+data <- merge(data,data9,by="V1")
+data <- merge(data,data10,by="V1")
+write.csv(data,"data2.csv")
+col_mean <- c()
+for(i in 1:dim(data)[1]){
+  a <- as.numeric(data[i,])
+  col_mean[i] <- mean(a[2:11])
+}
+names(col_mean) <- data$V1
+write.csv(col_mean,"drug_10p.csv")

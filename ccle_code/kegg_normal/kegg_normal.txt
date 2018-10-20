@@ -1,0 +1,11 @@
+setwd("D:/R/R-3.4.2/workspace/ccle_code/kegg_normal")
+load("path_data_matrix.RData")
+path_data_matrix_normal <- path_data_matrix
+for(i in 1:dim(path_data_matrix)[1]){
+  path_i <- path_data_matrix[i,]
+  path_i_normal <- (path_i-min(path_i))/(max(path_i)-min(path_i))
+  path_data_matrix_normal[i,] <- path_i_normal
+}
+save(path_data_matrix_normal,file="path_data_matrix_normal.RData")
+result <- cor(path_data_matrix_normal,method="pearson")
+write.csv(result,"dd_pathway.csv")

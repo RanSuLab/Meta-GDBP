@@ -1,0 +1,223 @@
+#### build the GBM model
+library("caret") 
+setwd("D:/R/R-3.4.2/workspace/ccle_code/cc_elasticnet/cc")
+load("ccle_drugdata.RData")
+train_drugdata <- list()
+test_drugdata <- list()	
+drugs <- levels(as.factor(ccle_drugdata$DRUG))
+load("folds.RData")
+for(k in 1:24){
+  for(j in 1:10){
+    traindata<-ccle_drugdata[-folds[[j]],]  
+    testdata<-ccle_drugdata[folds[[j]],]
+    filename <- paste(k,".csv",sep="")
+    csn <- read.csv(filename)
+    train_drugdata[[k]] <- traindata[which(traindata$DRUG==drugs[k]),]
+	train_drugdata[[k]]$CName <- as.character(train_drugdata[[k]]$CName)
+    for(i in 1:dim(train_drugdata[[k]])[1]){
+      if(substring(train_drugdata[[k]]$CName[i],1,1) %in% c("0","1","2","3","4","5","6","7","8","9")){
+	    train_drugdata[[k]]$CName[i] <- as.character(paste("X",as.character(train_drugdata[[k]]$CName[i]),sep=""))
+	  }else{
+	    train_drugdata[[k]]$CName[i] <- as.character(train_drugdata[[k]]$CName[i])
+      }
+
+    }
+    colnames(csn)[1] <- "CName"
+    traincsn <- merge(train_drugdata[[k]],csn,by="CName")
+    traincsn2 <- traincsn[,10:dim(traincsn)[2]]
+    trainy <- traincsn$Acta_Normal
+    X2 <- as.matrix(traincsn2)
+    library("msgps")
+    fit <- msgps(X2,trainy,penalty="enet",alpha=0.5)
+    filename2 <- paste(k,j,sep="")
+    fit_coef <- paste(filename2,"fit_coef.csv",sep="")
+    write.csv(coef(fit),fit_coef)
+    tuning <- c()
+    tuning[1] <- fit$dfcp_result$tuning
+    tuning[2] <- fit$dfaicc_result$tuning
+	tuning[3] <- fit$dfgcv_result$tuning
+	tuning[4] <- fit$dfbic_result$tuning
+	df <- c()
+    df[1] <- fit$dfcp_result$df
+    df[2] <- fit$dfaicc_result$df
+	df[3] <- fit$dfgcv_result$df
+	df[4] <- fit$dfbic_result$df
+	fit_param <- data.frame(tuning,df)
+	fit_param_output <- paste(filename2,"fit_param.csv",sep="")
+	write.csv(fit_param,fit_param_output)
+    test_drugdata[[k]] <- testdata[which(testdata$DRUG==drugs[k]),]
+	test_drugdata[[k]]$CName <- as.character(test_drugdata[[k]]$CName)	
+    for(i in 1:dim(test_drugdata[[k]])[1]){
+       if(substring(test_drugdata[[k]]$CName[i],1,1) %in% c("0","1","2","3","4","5","6","7","8","9")){
+	    test_drugdata[[k]]$CName[i] <- as.character(paste("X",as.character(test_drugdata[[k]]$CName[i]),sep=""))
+	  }else{
+	    test_drugdata[[k]]$CName[i] <- as.character(test_drugdata[[k]]$CName[i])
+      }
+    }
+    testcsn <- merge(test_drugdata[[k]],csn,by="CName")
+	filename5 <- paste(filename2,".csv",sep="")
+	write.csv(testcsn,filename5)
+    testcsn2 <- testcsn[,10:dim(testcsn)[2]]
+    X2 <- as.matrix(testcsn2)
+    testy <- testcsn$Acta_Normal
+    a <- predict(fit,X2)
+    filename3 <- paste(filename2,"predict.csv")
+    write.csv(a,filename3)
+    filename4 <- paste(filename2,"real.csv")
+    write.csv(testy,filename4) 
+    cresult <- c()
+    for(i in 1:4){
+	  if(sd(a[,i])==0){
+	    cresult[i] <- "NA"
+	  }else{
+        cresult[i] <- cor(a[,i],testy)
+	  }
+    }
+	filename6 <- paste(k,"cresult.txt",sep="")
+    cat(cresult,file=filename6,seq="\n",append=T)
+  }
+}
+#### you need to put all the output files into correct file
+####such as put the output files of drug 1 into the dir 1-10
+####put the output files of drug 11 into the dir 11-20
+####put the output files of drug 21 into the dir 21-24...
+
+
+#### put all the output files in one fold into one dir
+setwd("D:/R/R-3.4.2/workspace/ccle_code/cc_elasticnet/cc")
+
+for(i in 1:20){
+ if(i%%10==1){
+   dir1 <- paste(i,"-",sep="")
+   dir <- paste(dir1,i+9,sep="")
+ }
+ if(i%%10==2){
+   dir1 <- paste(i-1,"-",sep="")
+   dir <- paste(dir1,i+8,sep="")
+ }
+ if(i%%10==3){
+   dir1 <- paste(i-2,"-",sep="")
+   dir <- paste(dir1,i+7,sep="")
+ }
+ if(i%%10==4){
+   dir1 <- paste(i-3,"-",sep="")
+   dir <- paste(dir1,i+6,sep="")
+ }
+ if(i%%10==5){
+   dir1 <- paste(i-4,"-",sep="")
+   dir <- paste(dir1,i+5,sep="")
+ }
+ if(i%%10==6){
+   dir1 <- paste(i-5,"-",sep="")
+   dir <- paste(dir1,i+4,sep="")
+ }
+ if(i%%10==7){
+   dir1 <- paste(i-6,"-",sep="")
+   dir <- paste(dir1,i+3,sep="")
+ }
+ if(i%%10==8){
+   dir1 <- paste(i-7,"-",sep="")
+   dir <- paste(dir1,i+2,sep="")
+ }
+ if(i%%10==9){
+   dir1 <- paste(i-8,"-",sep="")
+   dir <- paste(dir1,i+1,sep="")
+ }
+ if(i%%10==0){
+   dir1 <- paste(i-9,"-",sep="")
+   dir <- paste(dir1,i,sep="")
+ }
+ dir_path <- paste(dir,"/",sep="")
+ filename1 <- paste(i,"1 predict.csv",sep="")
+ filename2 <- paste(i,"1 real.csv",sep="")
+ filename3 <- paste(i,"1.csv",sep="")
+ filepath1 <- paste(dir_path,filename1,sep="")
+ filepath2 <- paste(dir_path,filename2,sep="")
+ filepath3 <- paste(dir_path,filename3,sep="")
+ path1 <- paste("j=1/",filename1,sep="")
+ path2 <- paste("j=1/",filename2,sep="")
+ path3 <- paste("j=1/",filename3,sep="")
+ file.copy(filepath1, path1)
+ file.copy(filepath2, path2)
+ file.copy(filepath3, path3)
+}
+for(i in 21:24){
+ filename1 <- paste(i,"1 predict.csv",sep="")
+ filename2 <- paste(i,"1 real.csv",sep="")
+ filename3 <- paste(i,"1.csv",sep="")
+ filepath1 <- paste("21-24/",filename1,sep="")
+ filepath2 <- paste("21-24/",filename2,sep="")
+ filepath3 <- paste("21-24/",filename3,sep="")
+ path1 <- paste("j=1/",filename1,sep="")
+ path2 <- paste("j=1/",filename2,sep="")
+ path3 <- paste("j=1/",filename3,sep="")
+ file.copy(filepath1, path1)
+ file.copy(filepath2, path2)
+ file.copy(filepath3, path3)
+}
+
+
+
+
+####merge all the test result into one file of each fold
+setwd("D:/R/R-3.4.2/workspace/ccle_code/cc_elasticnet/cc/j=1")
+
+for(i in 1:24){
+  filename <- paste(i,"1",sep="")
+  filename1 <- paste(i,"1 predict.csv",sep="")
+  filename2 <- paste(i,"1 real.csv",sep="")
+  filename3 <- paste(i,"1.csv",sep="")
+  cc_cd <- read.csv(filename3)
+  cc_predict <- read.csv(filename1)
+  cc_real <- read.csv(filename2)
+  cc <- cbind(cc_cd[,2:4],cc_predict[,2:5])
+  cc <- cbind(cc,cc_real[,2])
+  cc$Acta_Normal <- cc_cd$Acta_Normal
+  write.csv(cc,paste(filename,"cols.csv",sep=""))
+  
+}
+cclist <- data.frame(matrix(NA,2,10))
+names(cclist) <- c("X","CName","PName","DRUG" ,"Cp","AICc","GCV","BIC","cc_real...2.","Acta_Normal")
+for(i in 1:24){
+  filename <- paste(i,"1",sep="")
+  cc<- read.csv(paste(filename,"cols.csv",sep=""))
+  cclist <- rbind(cclist,cc) 
+}
+write.csv(cclist,"cclist.csv")
+
+
+
+####For each fold, get the pearson correation of predicted response and observed response of each drug,and put them into one file
+setwd("D:/R/R-3.4.2/workspace/ccle_code/cc_elasticnet/cc")
+data1 <- read.csv("j=1/cclist.csv")
+data1 <- data1[3:dim(data1)[1],]
+drugs <- levels(data1$DRUG)
+all_data <- data.frame(matrix(NA,2,2))
+names(all_data) <- c("drugs.i.","a")
+for(i in 1:length(drugs)){
+  drug <- data1[which(data1$DRUG==drugs[i]),]
+  a <- cor(drug$Cp,drug$Acta_Normal)
+  drug_data <- data.frame(drugs[i],a)
+  all_data <- rbind(all_data,drug_data)
+}
+all_data <- all_data[3:dim(all_data)[1],]
+write.csv(all_data,"data-j1.csv")
+
+
+
+####Merge all the pearson result of each fold into one file,the cc model accuarcy can be found in dddd_cc.csv
+dddd1 <- read.csv("data-j1.csv")
+dddd2 <- read.csv("data-j2.csv")
+dddd3 <- read.csv("data-j3.csv")
+dddd4 <- read.csv("data-j4.csv")
+dddd5 <- read.csv("data-j5.csv")
+dddd6 <- read.csv("data-j6.csv")
+dddd7 <- read.csv("data-j7.csv")
+dddd8 <- read.csv("data-j8.csv")
+dddd9 <- read.csv("data-j9.csv")
+dddd10 <- read.csv("data-j10.csv")
+dddd_cc <- data.frame(dddd1$drugs.i.,dddd1$a,dddd2$a,dddd3$a,dddd4$a,dddd5$a,dddd6$a,dddd7$a,dddd8$a,dddd9$a,dddd10$a)
+
+
+
+
