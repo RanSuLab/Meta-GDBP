@@ -1,8 +1,9 @@
-# Multi-layer-Network
+# Meta-GDBP
 # Presentation
-  It contains four subnet--GBM,DBM,PBM,BBM.  
-  We use each subnet to predict response of the drug-cell line pair in CCLE and CGP.  
-  We also use the weighted method(something like the linear regression) to predict response of the drug-cell line pair in CCLE and CGP.
+  Meta-GDBP is a high-level stacked algorithm which has two stages.
+  At the top-level stage, It contains four base models (BMs)--GBM,DBM,PBM,BBM.  
+  We use each BM to predict response of the drug-cell line pair in CCLE and CGP.  
+  At the bottom-level stage, We use the weighted method to predict response of the drug-cell line pair in CCLE and CGP.
 # R version
   R-3.4.2
 # How to Use
